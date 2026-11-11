@@ -32,6 +32,15 @@ button.ghost{background:rgba(0,0,0,.45);font-size:16px;padding:10px 0}
 .row{display:flex;gap:10px}
 .row button{width:130px}
 #tDots{letter-spacing:4px;color:var(--gold)}
+#select{gap:8px}
+#select button[data-d]{padding:9px 0}
+.rec{color:var(--gold);opacity:.95}
+#seed{width:214px;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1px solid var(--gold);background:rgba(0,0,0,.55);color:var(--cream);font:inherit;font-size:16px}
+.fx{font-size:22px;font-weight:bold;letter-spacing:3px}
+.fx.fc{color:#7cc8ff;text-shadow:0 0 12px #7cc8ff;animation:pulse 1s infinite}
+.fx.ap{background:linear-gradient(90deg,#ffd65a,#fff,#ffd65a,#ff9ad0,#7cc8ff,#ffd65a);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 2s linear infinite;filter:drop-shadow(0 0 8px #ffd65a)}
+@keyframes pulse{50%{opacity:.45}}
+@keyframes shine{to{background-position:300% 0}}
 </style>
 </head>
 <body>
@@ -47,11 +56,12 @@ button.ghost{background:rgba(0,0,0,.45);font-size:16px;padding:10px 0}
 </div>
 <div class="scr" id="select">
   <h2>難易度を選択</h2>
-  <button data-d="easy">初級 EASY<small>BPM 90 ・ 4分音符 / 8分音符</small></button>
-  <button data-d="normal">中級 NORMAL<small>BPM 120 ・ 16分音符 / 休符</small></button>
-  <button data-d="hard">上級 HARD<small>BPM 145 ・ 16分音符の複合 / 細かな休符</small></button>
-  <button data-d="expert">超上級 EXPERT<small>BPM 160 ・ 1501ノーツ</small></button>
-  <button data-d="master">MASTER<small>BPM 200 ・ 1722ノーツ</small></button>
+  <button data-d="easy">初級 EASY<small>BPM 90 ・ 4分音符 / 8分音符</small><small class="rec" data-r="easy"></small></button>
+  <button data-d="normal">中級 NORMAL<small>BPM 120 ・ 16分音符 / 休符</small><small class="rec" data-r="normal"></small></button>
+  <button data-d="hard">上級 HARD<small>BPM 145 ・ 16分音符の複合 / 細かな休符</small><small class="rec" data-r="hard"></small></button>
+  <button data-d="expert">超上級 EXPERT<small>BPM 160 ・ 1501ノーツ</small><small class="rec" data-r="expert"></small></button>
+  <button data-d="master">MASTER<small>BPM 200 ・ 1722ノーツ</small><small class="rec" data-r="master"></small></button>
+  <div class="row" style="align-items:center"><input id="seed" placeholder="シード（空欄＝固定譜面）" maxlength="20"><button class="ghost" id="bDice" style="width:48px" aria-label="ランダム譜面">🎲</button></div>
   <div class="row" style="align-items:center"><button class="ghost" id="spM" style="width:48px">−</button><div id="spV" style="width:170px;font-size:14px"></div><button class="ghost" id="spP" style="width:48px">＋</button></div>
   <button class="ghost" id="bBack">ホームへ戻る</button>
 </div>
@@ -73,6 +83,7 @@ button.ghost{background:rgba(0,0,0,.45);font-size:16px;padding:10px 0}
 <div class="scr" id="result">
   <h2 id="rTitle">RESULT</h2>
   <div id="rClear" style="font-size:26px;letter-spacing:4px;font-weight:bold"></div>
+  <div id="rFx" class="fx"></div>
   <div class="rank" id="rRank">S</div>
   <div class="tbl">
     <div><span>達成率</span><b id="rRate">0%</b></div>
@@ -120,7 +131,7 @@ function fit(){const s=Math.min(innerWidth/W,innerHeight/H);$('stage').style.tra
 addEventListener('resize',fit);fit();
 // screens
 let state='home';
-function show(n){state=n;for(const s of ['home','select','result','pause','tut'])$(s).classList.toggle('on',s===n);$('pbtn').style.display=n==='play'?'block':'none'}
+function show(n){state=n;for(const s of ['home','select','result','pause','tut'])$(s).classList.toggle('on',s===n);$('pbtn').style.display=n==='play'?'block':'none';if(n==='select')showRecs()}
 $('bStart').onclick=()=>{initAudio();try{if(!localStorage.getItem('rm_tut')){localStorage.setItem('rm_tut','1');openTut('start');return}}catch(e){}show('select')};
 $('bTut').onclick=()=>{initAudio();openTut('home')};
 $('bBack').onclick=()=>show('home');
@@ -143,6 +154,12 @@ $('tPlay').onclick=()=>{initAudio();start('tutorial')};
 $('tClose').onclick=()=>show(tutFrom==='start'?'select':'home');
 function setSpd(v){SPD=Math.min(1.4,Math.max(.4,Math.round(v*20)/20));PPB=140*SPD;$('spV').textContent='スクロール速度 ×'+SPD.toFixed(2);try{localStorage.setItem('rm_spd',SPD)}catch(e){}}
 $('spM').onclick=()=>setSpd(SPD-.05);$('spP').onclick=()=>setSpd(SPD+.05);setSpd(SPD);
+let SEED=null;const RO={C:1,B:2,A:3,S:4};
+function hashSeed(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+function recGet(d){const z={s:0,r:'',c:0,f:0,a:0};try{return Object.assign(z,JSON.parse(localStorage.getItem('rm_rec_'+d)))}catch(e){return z}}
+function recSave(d,r){try{localStorage.setItem('rm_rec_'+d,JSON.stringify(r))}catch(e){}}
+function showRecs(){document.querySelectorAll('.rec').forEach(el=>{const r=recGet(el.dataset.r);el.textContent=r.s?'BEST '+r.s+' ・ '+(r.r||'-')+(r.c?' ・ CLEAR':'')+(r.a?' ・ AP':r.f?' ・ FC':''):'NO RECORD'})}
+$('bDice').onclick=()=>{$('seed').value=String(Math.floor(Math.random()*900000)+100000)};
 function pauseGame(){if(state!=='play'||!G)return;G.pt=now()-G.t0;show('pause')}
 $('pbtn').onclick=pauseGame;
 $('bResume').onclick=()=>{G.t0=now()-(G.pt-1500);show('play')};
@@ -153,7 +170,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseGame()
 document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{initAudio();start(b.dataset.d)});
 // chart
 function rng(seed){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}}
-function build(d){const r=rng(d.length*977+DIFF[d].bpm),P=PAT[d],GL=GOAL[d],out=[];let beat=0,last=null,cnt=0,m=0;
+function build(d){const r=rng(SEED!==null?SEED+DIFF[d].bpm:d.length*977+DIFF[d].bpm),P=PAT[d],GL=GOAL[d],out=[];let beat=0,last=null,cnt=0,m=0;
  const add=p=>{for(const t of p){const rest=t[0]==='r';out.push({t,beat:beat+LEAD,rest,done:false});beat+=DUR[t];if(!rest)cnt++}};
  const nn=p=>p.filter(t=>t[0]!=='r').length;
  add(['q','q','q','q']);m++;
@@ -167,8 +184,8 @@ function build(d){const r=rng(d.length*977+DIFF[d].bpm),P=PAT[d],GL=GOAL[d],out=
 // game
 let cur='easy',G=null,tapAnim=-9999,flash=null,judgeTxt=null,beepK=-1;
 const now=()=>performance.now();
-function start(d){cur=d;const D=DIFF[d],c=build(d);PW=D.pw;GW=D.gw;
- G={d,bpm:D.bpm,bm:60000/D.bpm,notes:c.notes,total:c.total,end:(c.beats+LEAD)*60000/D.bpm+1500,score:0,combo:0,max:0,P:0,Gr:0,M:0,t0:now()};
+function start(d){cur=d;const sv=d==='tutorial'?'':$('seed').value.trim();SEED=sv?hashSeed(sv):null;const D=DIFF[d],c=build(d);PW=D.pw;GW=D.gw;
+ G={d,seed:sv,bpm:D.bpm,bm:60000/D.bpm,notes:c.notes,total:c.total,end:(c.beats+LEAD)*60000/D.bpm+1500,score:0,combo:0,max:0,P:0,Gr:0,M:0,t0:now()};
  beepK=-1;judgeTxt=null;flash=null;show('play')}
 function judge(j,n){n.done=true;
  if(j==='M'){G.M++;G.combo=0}
@@ -183,7 +200,10 @@ addEventListener('pointerdown',e=>{if(e.target.closest&&e.target.closest('button
 addEventListener('keydown',e=>{if(e.code==='Escape')pauseGame();if(e.code==='Space'&&state==='play'){e.preventDefault();tap()}});
 function finish(){const acc=G.total?(G.P+G.Gr*.6)/G.total:0,rk=acc>=.92?'S':acc>=.8?'A':acc>=.6?'B':'C';
  $('rTitle').textContent='RESULT ・ '+DIFF[G.d].name;{const rate=acc*100,ok=rate>=DIFF[G.d].cl;$('rClear').textContent=(ok?'CLEAR！':'FAILED')+'　/ LINE '+DIFF[G.d].cl+'%';$('rClear').style.color=ok?'#6be38a':'#ff6b6b';$('rRate').textContent=rate.toFixed(1)+'%';}$('rRank').textContent=rk;$('rScore').textContent=G.score;$('rCombo').textContent=G.max;$('rP').textContent=G.P;$('rG').textContent=G.Gr;$('rM').textContent=G.M;
- let b=0;try{const k='rm_best_'+G.d;b=+localStorage.getItem(k)||0;if(G.score>b){localStorage.setItem(k,G.score);$('best').textContent='NEW RECORD！'}else $('best').textContent='ベストスコア '+b}catch(e){$('best').textContent=''}
+ const fc=G.M===0,ap=fc&&G.Gr===0;let msg='';
+ if(G.seed)msg='シード「'+G.seed+'」（記録対象外）';
+ else if(G.d!=='tutorial'){const r=recGet(G.d),nr=G.score>r.s;if(nr)r.s=G.score;if((RO[rk]||0)>(RO[r.r]||0))r.r=rk;if(acc*100>=DIFF[G.d].cl)r.c=1;if(fc)r.f=1;if(ap)r.a=1;recSave(G.d,r);msg=nr?'NEW RECORD！':'ベストスコア '+r.s}
+ $('best').textContent=msg;$('rFx').textContent=ap?'✨ ALL PERFECT!! ✨':fc?'FULL COMBO!':'';$('rFx').className='fx'+(ap?' ap':fc?' fc':'');
  show('result');G=null}
 // draw
 function draw(img,x,y,w,h,fb){if(img)cx.drawImage(img,x,y,w,h);else{cx.fillStyle='#000';fb&&fb(x,y,w,h)}}
