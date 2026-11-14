@@ -33,7 +33,8 @@ button.ghost{background:rgba(0,0,0,.45);font-size:16px;padding:10px 0}
 .row button{width:130px}
 #tDots{letter-spacing:4px;color:var(--gold)}
 #select{gap:8px}
-#select button[data-d]{padding:9px 0}
+#select button[data-d]{padding:7px 0}
+#select{gap:6px}
 .rec{color:var(--gold);opacity:.95}
 #seed{width:214px;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1px solid var(--gold);background:rgba(0,0,0,.55);color:var(--cream);font:inherit;font-size:16px}
 .fx{font-size:22px;font-weight:bold;letter-spacing:3px}
@@ -61,6 +62,7 @@ button.ghost{background:rgba(0,0,0,.45);font-size:16px;padding:10px 0}
   <button data-d="hard">上級 HARD<small>BPM 145 ・ 16分音符の複合 / 細かな休符</small><small class="rec" data-r="hard"></small></button>
   <button data-d="expert">超上級 EXPERT<small>BPM 160 ・ 1501ノーツ</small><small class="rec" data-r="expert"></small></button>
   <button data-d="master">MASTER<small>BPM 200 ・ 1722ノーツ</small><small class="rec" data-r="master"></small></button>
+  <button class="ghost" id="bLen" style="width:270px;padding:8px 0;font-size:14px"></button>
   <div class="row" style="align-items:center"><input id="seed" placeholder="シード（空欄＝固定譜面）" maxlength="20"><button class="ghost" id="bDice" style="width:48px" aria-label="ランダム譜面">🎲</button></div>
   <div class="row" style="align-items:center"><button class="ghost" id="spM" style="width:48px">−</button><div id="spV" style="width:170px;font-size:14px"></div><button class="ghost" id="spP" style="width:48px">＋</button></div>
   <button class="ghost" id="bBack">ホームへ戻る</button>
@@ -154,11 +156,13 @@ $('tPlay').onclick=()=>{initAudio();start('tutorial')};
 $('tClose').onclick=()=>show(tutFrom==='start'?'select':'home');
 function setSpd(v){SPD=Math.min(1.4,Math.max(.4,Math.round(v*20)/20));PPB=140*SPD;$('spV').textContent='スクロール速度 ×'+SPD.toFixed(2);try{localStorage.setItem('rm_spd',SPD)}catch(e){}}
 $('spM').onclick=()=>setSpd(SPD-.05);$('spP').onclick=()=>setSpd(SPD+.05);setSpd(SPD);
-let SEED=null;const RO={C:1,B:2,A:3,S:4};
+let SEED=null,SHORT=false;try{SHORT=localStorage.getItem('rm_short')==='1'}catch(e){}
+function lenLabel(){$('bLen').textContent=SHORT?'曲の長さ：SHORT（約1分45秒）':'曲の長さ：通常（約3〜5分）'}
+$('bLen').onclick=()=>{SHORT=!SHORT;try{localStorage.setItem('rm_short',SHORT?'1':'0')}catch(e){}lenLabel();showRecs()};lenLabel();const RO={C:1,B:2,A:3,S:4};
 function hashSeed(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
 function recGet(d){const z={s:0,r:'',c:0,f:0,a:0};try{return Object.assign(z,JSON.parse(localStorage.getItem('rm_rec_'+d)))}catch(e){return z}}
 function recSave(d,r){try{localStorage.setItem('rm_rec_'+d,JSON.stringify(r))}catch(e){}}
-function showRecs(){document.querySelectorAll('.rec').forEach(el=>{const r=recGet(el.dataset.r);el.textContent=r.s?'BEST '+r.s+' ・ '+(r.r||'-')+(r.c?' ・ CLEAR':'')+(r.a?' ・ AP':r.f?' ・ FC':''):'NO RECORD'})}
+function showRecs(){document.querySelectorAll('.rec').forEach(el=>{const r=recGet(el.dataset.r+(SHORT?'_s':''));el.textContent=r.s?'BEST '+r.s+' ・ '+(r.r||'-')+(r.c?' ・ CLEAR':'')+(r.a?' ・ AP':r.f?' ・ FC':''):'NO RECORD'})}
 $('bDice').onclick=()=>{$('seed').value=String(Math.floor(Math.random()*900000)+100000)};
 function pauseGame(){if(state!=='play'||!G)return;G.pt=now()-G.t0;show('pause')}
 $('pbtn').onclick=pauseGame;
@@ -174,10 +178,11 @@ function build(d){const r=rng(SEED!==null?SEED+DIFF[d].bpm:d.length*977+DIFF[d].
  const add=p=>{for(const t of p){const rest=t[0]==='r';out.push({t,beat:beat+LEAD,rest,done:false});beat+=DUR[t];if(!rest)cnt++}};
  const nn=p=>p.filter(t=>t[0]!=='r').length;
  add(['q','q','q','q']);m++;
- while(cnt<GL-4){let p;
+ const SH=SHORT&&d!=='tutorial',TB=105*DIFF[d].bpm/60-LEAD-4;
+ while(SH?beat<TB:cnt<GL-4){let p;
   if(d!=='easy'&&m%24===23)p=['rw'];
   else{const pool=m<4?E1.slice(0,5):P;let i;do{i=Math.floor(r()*pool.length)}while(pool[i]===last&&pool.length>1);p=pool[i];last=p}
-  if(cnt+nn(p)>GL-4){while(cnt<GL-4)add(['e']);break}
+  if(!SH&&cnt+nn(p)>GL-4){while(cnt<GL-4)add(['e']);break}
   add(p);m++}
  add(['q','q','q','q']);
  return {notes:out,total:cnt,beats:beat}}
@@ -185,7 +190,7 @@ function build(d){const r=rng(SEED!==null?SEED+DIFF[d].bpm:d.length*977+DIFF[d].
 let cur='easy',G=null,tapAnim=-9999,flash=null,judgeTxt=null,beepK=-1;
 const now=()=>performance.now();
 function start(d){cur=d;const sv=d==='tutorial'?'':$('seed').value.trim();SEED=sv?hashSeed(sv):null;const D=DIFF[d],c=build(d);PW=D.pw;GW=D.gw;
- G={d,seed:sv,bpm:D.bpm,bm:60000/D.bpm,notes:c.notes,total:c.total,end:(c.beats+LEAD)*60000/D.bpm+1500,score:0,combo:0,max:0,P:0,Gr:0,M:0,t0:now()};
+ G={d,seed:sv,sh:SHORT&&d!=='tutorial',bpm:D.bpm,bm:60000/D.bpm,notes:c.notes,total:c.total,end:(c.beats+LEAD)*60000/D.bpm+1500,score:0,combo:0,max:0,P:0,Gr:0,M:0,t0:now()};
  beepK=-1;judgeTxt=null;flash=null;show('play')}
 function judge(j,n){n.done=true;
  if(j==='M'){G.M++;G.combo=0}
@@ -199,10 +204,10 @@ function tap(){if(state!=='play'||!G)return;tapAnim=now();hitSound();
 addEventListener('pointerdown',e=>{if(e.target.closest&&e.target.closest('button'))return;if(state==='play'){e.preventDefault();tap()}},{passive:false});
 addEventListener('keydown',e=>{if(e.code==='Escape')pauseGame();if(e.code==='Space'&&state==='play'){e.preventDefault();tap()}});
 function finish(){const acc=G.total?(G.P+G.Gr*.6)/G.total:0,rk=acc>=.92?'S':acc>=.8?'A':acc>=.6?'B':'C';
- $('rTitle').textContent='RESULT ・ '+DIFF[G.d].name;{const rate=acc*100,ok=rate>=DIFF[G.d].cl;$('rClear').textContent=(ok?'CLEAR！':'FAILED')+'　/ LINE '+DIFF[G.d].cl+'%';$('rClear').style.color=ok?'#6be38a':'#ff6b6b';$('rRate').textContent=rate.toFixed(1)+'%';}$('rRank').textContent=rk;$('rScore').textContent=G.score;$('rCombo').textContent=G.max;$('rP').textContent=G.P;$('rG').textContent=G.Gr;$('rM').textContent=G.M;
+ $('rTitle').textContent='RESULT ・ '+DIFF[G.d].name+(G.sh?' SHORT':'');{const rate=acc*100,ok=rate>=DIFF[G.d].cl;$('rClear').textContent=(ok?'CLEAR！':'FAILED')+'　/ LINE '+DIFF[G.d].cl+'%';$('rClear').style.color=ok?'#6be38a':'#ff6b6b';$('rRate').textContent=rate.toFixed(1)+'%';}$('rRank').textContent=rk;$('rScore').textContent=G.score;$('rCombo').textContent=G.max;$('rP').textContent=G.P;$('rG').textContent=G.Gr;$('rM').textContent=G.M;
  const fc=G.M===0,ap=fc&&G.Gr===0;let msg='';
  if(G.seed)msg='シード「'+G.seed+'」（記録対象外）';
- else if(G.d!=='tutorial'){const r=recGet(G.d),nr=G.score>r.s;if(nr)r.s=G.score;if((RO[rk]||0)>(RO[r.r]||0))r.r=rk;if(acc*100>=DIFF[G.d].cl)r.c=1;if(fc)r.f=1;if(ap)r.a=1;recSave(G.d,r);msg=nr?'NEW RECORD！':'ベストスコア '+r.s}
+ else if(G.d!=='tutorial'){const K=G.d+(G.sh?'_s':''),r=recGet(K),nr=G.score>r.s;if(nr)r.s=G.score;if((RO[rk]||0)>(RO[r.r]||0))r.r=rk;if(acc*100>=DIFF[G.d].cl)r.c=1;if(fc)r.f=1;if(ap)r.a=1;recSave(K,r);msg=nr?'NEW RECORD！':'ベストスコア '+r.s}
  $('best').textContent=msg;$('rFx').textContent=ap?'✨ ALL PERFECT!! ✨':fc?'FULL COMBO!':'';$('rFx').className='fx'+(ap?' ap':fc?' fc':'');
  show('result');G=null}
 // draw
